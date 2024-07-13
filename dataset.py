@@ -39,6 +39,7 @@ from monai.networks.nets.swin_unetr import SwinTransformer, MERGING_MODE
 from monai.networks.nets import SEResNet50, SEResNet101
 from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck
 
+from config import args, device
 
 class ResampleZ:
     def __init__(self, new_depth):
@@ -72,11 +73,11 @@ class RSNADataset(monai.data.Dataset):
 
         self.train_series_descriptions = train_series_descriptions
         self.labels = [
-            'spinal_canal_stenosis_l1_l2', 
+            'spinal_canal_stenosis_l1_l2',
             'spinal_canal_stenosis_l2_l3',
-            'spinal_canal_stenosis_l3_l4', 
+            'spinal_canal_stenosis_l3_l4',
             'spinal_canal_stenosis_l4_l5',
-            'spinal_canal_stenosis_l5_s1', 
+            'spinal_canal_stenosis_l5_s1',
             'left_neural_foraminal_narrowing_l1_l2',
             'left_neural_foraminal_narrowing_l2_l3',
             'left_neural_foraminal_narrowing_l3_l4',
@@ -106,7 +107,7 @@ class RSNADataset(monai.data.Dataset):
         self.ss_mapping = {
             0: "normal_mild", 1: "moderate", 2: "severe"
         }
-        self.data_dir = "/kaggle/input/rsna-2024-lumbar-spine-degenerative-classification"
+        self.data_dir = "."
 
     def __len__(self):
         return len(self.study_ids)
@@ -117,8 +118,8 @@ class RSNADataset(monai.data.Dataset):
 
         data = {}
         for series_id, series_description in series_descriptions[["series_id", "series_description"]].values:
-            if series_description == "Sagittal T2/STIR":
-                
+            if series_description == args.modality:
+
                 if self.is_train:
                     path_to_dicom_dir = f"{self.data_dir}/train_images/{study_id}/{series_id}"
                 else:
@@ -150,8 +151,8 @@ class RSNADataset(monai.data.Dataset):
         transform = monai.transforms.Compose([
             monai.transforms.LoadImage(),
             monai.transforms.EnsureChannelFirst(channel_dim=-1),
-            ResampleZ(new_depth=7),
-            monai.transforms.Resize((384, 384), mode='trilinear'),
+            ResampleZ(new_depth=args.resample_z_slices),
+            monai.transforms.Resize(args.image_size, mode='trilinear'),
             monai.transforms.NormalizeIntensity(),
             monai.transforms.ToTensor()
         ])

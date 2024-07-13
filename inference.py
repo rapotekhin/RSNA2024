@@ -39,6 +39,12 @@ from monai.networks.nets.swin_unetr import SwinTransformer, MERGING_MODE
 from monai.networks.nets import SEResNet50, SEResNet101
 from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck
 
+from config import args, device
+from dataset import RSNADataset
+from net import load_net
+from train_model import train_net
+from utils import label_smoothing, validate_model_with_submission_format
+
 # Validation function
 def inference_model(net, test_dataloader, ss, labels):
     
@@ -47,7 +53,7 @@ def inference_model(net, test_dataloader, ss, labels):
     net.eval()  # Set the model to evaluation mode
     with torch.no_grad():  # Disable gradient computation
         for batch in test_dataloader:
-            in_tensor = batch['Sagittal T1'].view(batch['Sagittal T1'].shape[1], 1, *batch['Sagittal T1'].shape[2:])
+            in_tensor = batch[args.modality].view(batch[args.modality].shape[1], 1, *batch[args.modality].shape[2:])
             study_id = int(batch['study_id'][0])
 
             predict = net(in_tensor).median(dim=0).values.softmax(dim=-1)
@@ -66,3 +72,20 @@ def inference_model(net, test_dataloader, ss, labels):
                 new_ss = pd.concat([new_ss, data_df], axis=0, ignore_index=True)
 
     return new_ss
+
+if __name__ == "__main__":
+    net = load_net()
+    net = net.to(device)
+    if device == 'cuda':
+        net = torch.compile(net)
+        net(torch.randn(1, 224, 224).to(device))
+    net.load_state_dict(torch.load(os.path.join(args.workdir, "model_best.pth"), map_location="cpu")["state_dict"])
+
+    test_series_descriptions = pd.read_csv("test_series_descriptions.csv")
+    ss = pd.read_csv("sample_submission.csv")
+
+    test_dataset = RSNADataset(df=None, train_series_descriptions=test_series_descriptions, is_train=False)
+    test_dataloader = monai.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+
+    new_ss = inference_model(net, test_dataloader, ss, test_dataset.labels)
+    new_ss.to_csv("submission.csv", index=False)

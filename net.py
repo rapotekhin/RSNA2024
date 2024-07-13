@@ -39,8 +39,7 @@ from monai.networks.nets.swin_unetr import SwinTransformer, MERGING_MODE
 from monai.networks.nets import SEResNet50, SEResNet101
 from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+from config import args, device
 
 class SEResNet101Custom(SEResNet101):
     """SEResNet50 based on `Squeeze-and-Excitation Networks` with optional pretrained support when spatial_dims is 2."""
@@ -166,3 +165,16 @@ class improved_SEResNet101Custom(SEResNet101):
         logits = logits.view(logits.size(0), 25, 3)  # Reshape to (1, 25, 3)
 
         return logits
+
+
+def load_net():
+    if args.model_name == "improved_SEResNet101Custom":
+        net = improved_SEResNet101Custom(
+            in_channels=args.in_channels, 
+            spatial_dims=args.spatial_dims, 
+            layers=args.layers, 
+            dropout_prob=args.dropout_prob, 
+            inplanes=args.inplanes
+        )
+
+    return net

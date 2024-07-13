@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 import tqdm
 import monai
-
+import shutil
 import itertools
 from collections.abc import Sequence
 import torch.nn as nn
@@ -39,13 +39,21 @@ from monai.networks.nets.swin_unetr import SwinTransformer, MERGING_MODE
 from monai.networks.nets import SEResNet50, SEResNet101
 from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck
 
+from clearml import Task
+
 from config import args, device
 from dataset import RSNADataset
-from net import improved_SEResNet101Custom
+from net import load_net
 from train_model import train_net
+from utils import label_smoothing, validate_model_with_submission_format
 
 if __name__ == "__main__":
-    
+    clearml = Task.init(
+        project_name=args.project_name, 
+        task_name=args.task_name, 
+        auto_connect_frameworks={"pytorch": False},
+        task_type=Task.TaskTypes.training
+    )
 
     train = pd.read_csv("train.csv")
     train_label_coordinates = pd.read_csv("train_label_coordinates.csv")
@@ -53,26 +61,34 @@ if __name__ == "__main__":
 
     train = train.dropna()
 
-    train, val = train_test_split(train, test_size=0.2, random_state=42)
+    train, val = train_test_split(train, test_size=args.test_size, random_state=args.random_state)
 
     train_dataset = RSNADataset(df=train, train_series_descriptions=train_series_descriptions)
     val_dataset = RSNADataset(df=val, train_series_descriptions=train_series_descriptions)
 
-    train_dataloader = monai.data.DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=0)
-    val_dataloader = monai.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=0)
+    train_dataloader = monai.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    val_dataloader = monai.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
 
-    net = improved_SEResNet101Custom(in_channels=1, spatial_dims=2, layers=(3, 4, 23, 3), dropout_prob=0.2, inplanes=64)
-    net = torch.nn.DataParallel(net)
-    net.load_state_dict(torch.load(f"{args.workdir}/model_best.pth", map_location="cpu")["state_dict"], strict=False)
+    net = load_net()
+    # net = torch.nn.DataParallel(net)
+    if os.path.isfile(args.checkpoint):
+        net.load_state_dict(torch.load(args.checkpoint, map_location="cpu")["state_dict"], strict=False)
     net = net.to(device)
 
     if device == 'cuda':
         net = torch.compile(net)
         net(torch.randn(1, 224, 224).to(device))
 
-    net = train_net()
+    net = train_net(net, train_dataloader, train, train_dataset, val_dataloader, val, val_dataset, clearml)
 
+    net.load_state_dict(torch.load(os.path.join(args.workdir, "model_best.pth"), map_location="cpu")["state_dict"])
+    net = net.to(device)
+
+    val_metric = validate_model_with_submission_format(net, val_dataloader, val, val_dataset.labels)
+
+    with open(os.path.join(args.workdir, "metrics.txt"), 'w') as f:
+        f.write(f"VAL LOGLOS: {val_metric}")
     # test_series_descriptions = pd.read_csv("test_series_descriptions.csv")
     # ss = pd.read_csv("sample_submission.csv")
 
