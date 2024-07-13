@@ -1,0 +1,6 @@
+/workdir
+/test_images
+/train_images
+*.zip
+*.pkl
+*.csv
