@@ -2,42 +2,14 @@
 # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
 # For example, here's several helpful packages to load
 import os
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import torch
-import numpy as np
 import pandas as pd
-import pandas.api.types
-import sklearn.metrics
-
 import warnings
 warnings.filterwarnings("ignore")
 
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.cuda.amp import GradScaler, autocast
-import matplotlib.pyplot as plt
 
-import tqdm
 import monai
-import shutil
-import itertools
-from collections.abc import Sequence
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.utils.checkpoint as checkpoint
-from torch.nn import LayerNorm
-from typing_extensions import Final
 from sklearn.model_selection import train_test_split
-
-from monai.networks.blocks import MLPBlock as Mlp
-from monai.networks.blocks import PatchEmbed, UnetOutBlock, UnetrBasicBlock, UnetrUpBlock
-from monai.networks.layers import DropPath, trunc_normal_
-from monai.utils import ensure_tuple_rep, look_up_option, optional_import
-from monai.utils.deprecate_utils import deprecated_arg
-from monai.networks.nets.swin_unetr import SwinTransformer, MERGING_MODE
-
-from monai.networks.nets import SEResNet50, SEResNet101
-from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck
 
 from clearml import Task
 
@@ -45,7 +17,7 @@ from config import args, device
 from dataset import RSNADataset
 from net import load_net
 from train_model import train_net
-from utils import label_smoothing, validate_model_with_submission_format
+from utils import validate_model_with_submission_format
 
 if __name__ == "__main__":
     clearml = Task.init(
