@@ -60,3 +60,9 @@ To run inference on new data, use the `inference.py` script:
 ```bash
 python inference.py
 ```
+
+### Kaggle submit
+
+Go to kaggle to my [submission notebook](https://www.kaggle.com/code/pansofluck/rsna2024-test-monai/notebook)
+
+Add your checkpoint as a Model (or use my default) and run it
