@@ -78,7 +78,7 @@ class RSNADataset(monai.data.Dataset):
         self.ss_mapping = {
             0: "normal_mild", 1: "moderate", 2: "severe"
         }
-        self.data_dir = "."
+        self.data_dir = "./dataset"
 
     def __len__(self):
         return len(self.study_ids)
