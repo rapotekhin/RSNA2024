@@ -4,3 +4,9 @@
 *.zip
 *.pkl
 *.csv
+*.pt
+*.pyc
+
+/venv
+/cache_dir
+/dataset

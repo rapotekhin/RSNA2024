@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore")
 from collections.abc import Sequence
 import torch.nn as nn
 
-from monai.networks.nets import SEResNet101
+from monai.networks.nets import SEResNet101, DenseNet121, SEResNext101
 from monai.networks.blocks.squeeze_and_excitation import SEResNetBottleneck
 
 from config import args
@@ -115,12 +115,6 @@ class improved_SEResNet101Custom(SEResNet101):
         # Concatenate feature maps along the channel dimension
         combined_features = torch.cat(feature_maps, dim=0)  # Shape (7, feature_dim, H, W)
 
-        # Apply additional convolutions
-        combined_features = self.conv1(combined_features)
-        combined_features = nn.GELU()(combined_features)
-        combined_features = self.conv2(combined_features)
-        combined_features = nn.GELU()(combined_features)
-
         # Apply self-attention
         B, C, H, W = combined_features.size()
         combined_features_flat = combined_features.view(B, C, -1).permute(2, 0, 1)  # Shape (H*W, B, C)
@@ -129,6 +123,13 @@ class improved_SEResNet101Custom(SEResNet101):
 
         # Sum feature maps
         combined_features = combined_features + attn_output
+
+        # Apply additional convolutions
+        combined_features = self.conv1(combined_features)
+        combined_features = nn.GELU()(combined_features)
+        combined_features = self.conv2(combined_features)
+        combined_features = nn.GELU()(combined_features)
+
         combined_features = combined_features.sum(dim=0, keepdim=True)  # Shape (1, feature_dim, H, W)
 
         # Apply final convolution
@@ -140,6 +141,50 @@ class improved_SEResNet101Custom(SEResNet101):
         return logits
 
 
+class DenseNet121_3D(DenseNet121):
+    def __init__(
+        self,
+        in_channels=args.in_channels,
+        spatial_dims=args.spatial_dims,
+        **kwargs,
+    ):
+        super().__init__(
+            in_channels=in_channels,
+            spatial_dims=spatial_dims,
+            out_channels=75,
+            **kwargs,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        x = self.class_layers(x)
+        x = x.view(x.size(0), 25, 3)
+        return x
+
+
+class SEResNext101_custom(SEResNext101):
+    def __init__(
+        self,
+        in_channels=args.in_channels,
+        spatial_dims=args.spatial_dims,
+        dropout_prob=args.dropout_prob,
+        **kwargs,
+    ):
+        super().__init__(
+            in_channels=in_channels,
+            spatial_dims=spatial_dims,
+            dropout_prob=dropout_prob,
+            num_classes=75,
+            **kwargs,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        x = self.logits(x)
+        x = x.view(x.size(0), 25, 3)
+        return x
+
+
 def load_net():
     if args.model_name == "improved_SEResNet101Custom":
         net = improved_SEResNet101Custom(
@@ -149,5 +194,14 @@ def load_net():
             dropout_prob=args.dropout_prob, 
             inplanes=args.inplanes
         )
-
+    elif args.model_name == "DenseNet121_3D":
+        net = DenseNet121_3D(
+            in_channels=args.in_channels,
+            spatial_dims=args.spatial_dims,
+        )
+    elif args.model_name == "SEResNext101_custom":
+        net = SEResNext101_custom(
+            in_channels=args.in_channels,
+            spatial_dims=args.spatial_dims,
+        )
     return net
